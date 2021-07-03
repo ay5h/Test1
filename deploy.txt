@@ -1,0 +1,28 @@
+from os import path, environ as env
+from pbi import Tenant, Workspace
+from redkite import deploy
+
+
+deployment_root = path.dirname(path.realpath(__file__))
+
+# Hold all possible model param values, key should match the parameter naming in the model. 
+# Add/remove/update parameters according to need
+params = {} 
+params['Data Server'] = f'{env.get("SQLDWSERVERNAME")}.database.windows.net'
+params['Target Schema'] = f'{env.get("BASE_SCHEMA")}-{env.get("RELEASE_ENVIRONMENTNAME").lower()}'
+params['Row Limit'] = env.get('ROW_LIMIT') or -1 # -1 triggers full model refresh
+
+# Getting and storing environment variables
+# Variable wrapped in env.get() are environment variables
+force_refresh = env.get('FORCE_MODEL_REFRESH').lower() in ['1', 'true', 'yes']
+db_creds = {'username': env.get('DB_USERNAME'), 'password': env.get('DB_PASSWORD')}
+credentials = {params['Data Server']: db_creds}
+tenant = Tenant(env.get("TENANTID"), env.get('PBI_SP'), env.get('PBI_SP_SECRET'))
+workspace = Workspace(tenant, env.get('WORKSPACE_ID'))
+
+print(f'* Deploying to [{workspace.name}] workspace')
+
+if not deploy(deployment_root, workspace, params, credentials, force_refresh, release=env.get('RELEASE_RELEASENAME')):
+    raise SystemExit('!! Deployment ended with errors (see logs above)')
+
+print('* Deployment completed successfully')
